@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H-A Gate Move</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap">
+<style>
+:root { --bg: #f6f7f8; --surface: #ffffff; --line: #dde2e6; --ink: #12181d; --ink-2: #4b565f; --accent: #0f5f7a; }
+@media (prefers-color-scheme: dark) { :root { --bg: #121619; --surface: #1a1f23; --line: #2f383e; --ink: #f1f4f6; --ink-2: #b4bec5; --accent: #5cb8d6; color-scheme: dark; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 "IBM Plex Sans Thai", "Leelawadee UI", Tahoma, sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: 48px; display: grid; gap: 20px; }
+h1 { margin: 0; font-size: 26px; } h1 span { color: var(--accent); }
+p { margin: 0; color: var(--ink-2); }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+a.card { display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; color: var(--ink); text-decoration: none; }
+a.card:hover, a.card:focus-visible { border-color: var(--accent); outline: none; }
+a.card b { color: var(--accent); }
+small { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<main>
+  <h1>H-A <span>Gate Move</span></h1>
+  <p>สรุปตู้เปล่าเข้า-ออก (GATE IN / GATE OUT) รายวันของ 5 ลาน: SMART BKK, BC, HAST, CELLO, PW แยกตาม TPSZ และ Consignee / Shipper / Agent พร้อมผลเทียบกับระบบ แสดงเฉพาะยอดตู้</p>
+  <ul>
+    <li><a class="card" href="dashboard.html"><b>Dashboard</b><small>กราฟและตารางสรุปรายวัน เลือกช่วงวันที่และลานได้</small></a></li>
+    <li><a class="card" href="gate-move-summary.xlsx"><b>ฐานข้อมูล Excel</b><small>Daily Summary และ System Compare ทุกวัน</small></a></li>
+    <li><a class="card" href="https://github.com/sirichai1265/ha-gate-move"><b>GitHub repo</b><small>โค้ดที่ใช้สร้างรีพอต</small></a></li>
+  </ul>
+</main>
+</body>
+</html>

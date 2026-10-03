@@ -331,6 +331,23 @@ if os.path.exists(TPL):
     DASH = os.path.join(GM, 'HA Gate Dashboard.html')
     open(DASH, 'w', encoding='utf-8').write(html)
     print('DASHBOARD:', DASH)
+    # ---------- public build (GitHub Pages, docs\): counts only, no container no. / customer / booking ----------
+    DOCS = os.path.join(GM, 'docs'); os.makedirs(DOCS, exist_ok=True)
+    pub_check = lambda c: '' if not c else 'OK' if c == 'OK' else 'X'
+    pub = dict(payload, public=True,
+               moves=[[m[0], m[1], m[2], m[3], m[4], '', m[6], '', '', '', pub_check(m[10])] for m in payload['moves']])
+    pdata = json.dumps(pub, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
+    phtml = re.sub(r'/\*__DATA__\*/\{.*?\};', lambda _: '/*__DATA__*/' + pdata + ';', open(TPL, encoding='utf-8').read(), count=1, flags=re.S)
+    open(os.path.join(DOCS, 'dashboard.html'), 'w', encoding='utf-8').write(phtml)
+    with pd.ExcelWriter(os.path.join(DOCS, 'gate-move-summary.xlsx'), engine='openpyxl') as xw:
+        for sh in ('Daily Summary', 'System Compare'):
+            if sh in dbx:
+                dbx[sh].to_excel(xw, sheet_name=sh, index=False)
+                w = xw.sheets[sh]
+                for c in w[1]: c.font = Font(bold=True, color='FFFFFF'); c.fill = PatternFill('solid', fgColor='1F4E78')
+                for c in w['A'][1:]: c.number_format = 'DD/MM/YYYY'
+                w.freeze_panes = 'A2'; w.auto_filter.ref = w.dimensions
+    print('PUBLIC (docs):', DOCS)
 # file all input reports into the day folder
 locked = []
 for f in dict.fromkeys(used_files + ([SYS] if SYS else [])):
