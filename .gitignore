@@ -1,0 +1,9 @@
+# Data stays local: yard reports, system exports, the database and the generated dashboard
+# contain customer names, bookings and container numbers.
+*.xls
+*.xlsx
+*.csv
+HA Gate Dashboard*.html
+[0-9][0-9].[0-9][0-9].[0-9][0-9][0-9][0-9]/
+~$*
+__pycache__/
