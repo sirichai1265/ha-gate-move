@@ -10,7 +10,8 @@ SRC = sys.argv[2] if len(sys.argv) > 2 else None
 SEARCH = ([SRC] if SRC else [D]) + ([os.path.join(GM, ARG_DATE)] if ARG_DATE else [])
 TPSZ = ['22GP','42GP','45GP','22RE','45RE','22UT','42UT']
 MAP = {('20','GP'):'22GP',('40','GP'):'42GP',('40','HC'):'45GP',('20','DC'):'22GP',('40','DC'):'42GP',
-       ('40','HQ'):'45GP',('20','RF'):'22RE',('40','RH'):'45RE',('20','RE'):'22RE'}
+       ('40','HQ'):'45GP',('20','RF'):'22RE',('40','RH'):'45RE',('20','RE'):'22RE',
+       ('20','OT'):'22UT',('40','OT'):'42UT',('20','UT'):'22UT',('40','UT'):'42UT'}  # open top
 CNTR = re.compile(r'^[A-Z]{4}\d{7}$')
 # GATE OUT: 16-char booking (HASLS00000000000) = Shipper, anything else (OFFHIRE-TWP-OCT-01, MT-TWP-SEP-28) = Agent
 BOOKING = re.compile(r'^[A-Z]{5}\d{11}$')
