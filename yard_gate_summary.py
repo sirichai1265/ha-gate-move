@@ -239,6 +239,23 @@ if SYS:
     if not DIFF_ROWS: c4.append(['ข้อมูลตรงกันทั้งหมด'])
     for col, w in zip('ABCDEFGH', (10, 11, 14, 11, 13, 12, 32, 50)): c4.column_dimensions[col].width = w
     print('COMPARE: diffs =', len(DIFF_ROWS))
+    # ---------- containers missing from the system -> upload rows in the 7-TEMPALTE.xls layout ----------
+    # Location | Container No | Move | GateDate (yyyymmdd) | GateTime (HHMM) | BL No (16 chars), all text
+    # Move: OUT Shipper / off-hire -> OEV, OUT MT-... job -> OEP, IN with I######## job -> IEP, other IN -> IED
+    # BL No: OUT = booking / job no.; IN = import BL, not in the yard reports -> left blank to fill in
+    def gate_hhmm(det):
+        d = dict(p.split(': ', 1) for p in det.split(' | ') if ': ' in p)
+        for k in ('Time', 'TIME'):
+            t = re.search(r'(\d{1,2})[:.](\d{2})', str(d.get(k, '')))
+            if t: return f'{int(t[1]):02d}{t[2]}'
+        t = re.search(r'\b(\d{1,2}):(\d{2})\b', det)
+        return f'{int(t[1]):02d}{t[2]}' if t else ''
+    def move_code(move, typ, ref):
+        if move == 'GATE OUT': return 'OEP' if ref.startswith('MT-') else 'OEV'
+        return 'IEP' if re.match(r'^I\d{8}$', ref) else 'IED'
+    miss = m[m._merge == 'left_only']
+    MISS_ROWS = [[r.Location, r.Cntr, move_code(r.Move, r.Type, str(r.Ref or '')), GATE_D.replace('-', ''),
+                  gate_hhmm(r.Detail), (str(r.Ref or '') if r.Move == 'GATE OUT' else '')[:16]] for _, r in miss.iterrows()]
 # Source sheet
 s2 = wb.create_sheet('Source Files'); s2.append(['Yard', 'Location', 'Move', 'Source file'])
 for _, r in res.iterrows(): s2.append([r.Yard, r.Location, r.Move, r.Source])
@@ -263,6 +280,18 @@ if SYS:
         for col, wd in zip('ABCDEFGHIJKL', (10, 9, 10, 14, 10, 12, 11, 28, 26, 60, 60, 40)): w.column_dimensions[col].width = wd
         w.freeze_panes = 'E4'; w.auto_filter.ref = f'A3:L{max(w.max_row, 3)}'
     print('saved', dout)
+    import xlwt
+    MISS = os.path.join(OUTDIR, f'{int(_mm)}-{int(_dd)}-MISSING.xls')
+    if MISS_ROWS:
+        xb = xlwt.Workbook(); xs = xb.add_sheet('Sheet')
+        for j, h in enumerate(['Location', 'Container No', 'Move', 'GateDate', 'GateTime', 'BL No']): xs.write(0, j, h)
+        for i, row in enumerate(MISS_ROWS, 1):
+            for j, v in enumerate(row): xs.write(i, j, str(v))
+        xb.save(MISS)
+        print(f'MISSING IN SYSTEM -> {MISS} ({len(MISS_ROWS)} ตู้)')
+        for row in MISS_ROWS: print('   ', row)
+    elif os.path.exists(MISS):
+        os.remove(MISS)  # an earlier run's list; nothing is missing any more
 # ---------- running database: GATE MOVE\GATE MOVE DATABASE.xlsx (re-running a day replaces that day) ----------
 NAME_KEYS = ['Consignee', 'Customer Name', 'REPO/CONSIGNEE', 'Shippers', 'Shipper Name', 'SHIPPER', 'Shipper']
 TIME_KEYS = ['Time', 'TIME']
