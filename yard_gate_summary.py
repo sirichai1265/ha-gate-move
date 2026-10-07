@@ -16,7 +16,7 @@ CNTR = re.compile(r'^[A-Z]{4}\d{7}$')
 # GATE OUT: 16-char booking (HASLS00000000000) = Shipper, anything else (OFFHIRE-TWP-OCT-01, MT-TWP-SEP-28) = Agent
 BOOKING = re.compile(r'^[A-Z]{5}\d{11}$')
 # GATE IN: haulage / shore job no. (MT-TWP-SEP-28, OFFHIRE-.., I20261725, 26BI01624) = Agent, customer name = Consignee
-AGENT = re.compile(r'^(?:[A-Z]+(?:-[A-Z0-9]+){2,}|I\d{8}|\d{2}[A-Z]{2}\d{3,})$')
+AGENT = re.compile(r'^(?:[A-Z]+(?: [A-Z]+)?(?:-[A-Z0-9]+){2,}|I\d{8}|\d{2}[A-Z]{2}\d{3,})$')  # also "OFF HIRE-HAST-OCT-01"
 TYPES = {'GATE IN': ['Consignee', 'Agent'], 'GATE OUT': ['Shipper', 'Agent']}
 def classify(move, cells):
     if move == 'GATE OUT':
