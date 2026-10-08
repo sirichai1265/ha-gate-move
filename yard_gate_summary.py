@@ -350,7 +350,10 @@ old = pd.read_excel(DB, sheet_name=None) if os.path.exists(DB) else {}
 with pd.ExcelWriter(DB, engine='openpyxl') as xw:
     for sh in dict.fromkeys(list(db_new) + list(old)):
         o = old.get(sh, pd.DataFrame())
-        if 'Date' in o.columns: o = o[pd.to_datetime(o['Date']) != gate_date]
+        if 'Date' in o.columns:  # replace this day's rows for the yards in this run only (yards can be run one at a time)
+            same_day = pd.to_datetime(o['Date']) == gate_date
+            if 'Location' in o.columns: same_day &= o['Location'].isin(det_all.Location.unique())
+            o = o[~same_day]
         n = db_new.get(sh, pd.DataFrame())
         out_df = pd.concat([x for x in (o, n) if not x.empty], ignore_index=True) if not (o.empty and n.empty) else n
         if 'Date' in out_df.columns:
