@@ -30,6 +30,8 @@ def file_date(f):  # dd/mm/yyyy from a report file name (dd.mm.yyyy / dd_mm_yyyy
     if m: return f'{m[1]}/{m[2]}/{m[3]}'
     m = re.search(r'(20\d{2})-(\d{2})-(\d{2})', b)
     if m: return f'{m[3]}/{m[2]}/{m[1]}'
+    m = re.search(r'(?<!\d)(\d{2})[._](\d{2})[._](\d{2})(?!\d)', b)  # dd.mm.yy (e.g. "GATE IN  08.10.26")
+    if m: return f'{m[1]}/{m[2]}/20{m[3]}'
 def g(p):
     for d in SEARCH:
         m = sorted(glob.glob(os.path.join(d, p)))
@@ -69,11 +71,12 @@ def parse(df, move):
         if k: out[(cat, k)] += 1; cl.append((v[idx], k, cat, ref, ' | '.join(f'{hdr.get(c, c)}: {x}' for c, x in r.items() if pd.notna(x))))
         elif v[idx] not in {c[0] for c in cl}: bad.append((v[idx], size, typ))  # stray repeat of a listed container: ignore
     return out, bad, cl
-rows, issues, yard_cntrs, used_files = [], [], [], []
+rows, issues, yard_cntrs, used_files, skipped = [], [], [], [], []
 for name, loc, pat, si, so in YARDS:
     if isinstance(pat, tuple): fi, fo = g(pat[0]), g(pat[1])
     else: fi = fo = g(pat)
-    if not fi or not fo: sys.exit(f'ไม่พบไฟล์รีพอตของลาน {name} ({pat})')
+    if not fi or not fo:  # this yard's reports have not arrived: summarise the yards that are here
+        print(f'SKIP: ไม่พบไฟล์รีพอตของลาน {name} ({pat})'); skipped.append(name); continue
     used_files += [fi, fo]
     for move, f, s in (('GATE IN', fi, si), ('GATE OUT', fo, so)):
         c, bad, cl = parse(sheet(f, s), move)
@@ -82,6 +85,7 @@ for name, loc, pat, si, so in YARDS:
             rows.append({'Yard': name, 'Location': loc, 'Move': move, 'Type': cat, **{t: c.get((cat, t), 0) for t in TPSZ},
                          'Total': sum(n for (ct, _), n in c.items() if ct == cat), 'Source': os.path.basename(f)})
         issues += [(name, move, *b) for b in bad]
+if not rows: sys.exit('ไม่พบไฟล์รีพอตของลานใดเลย')
 det_all = pd.DataFrame(rows)
 print(det_all.drop(columns='Source').to_string(index=False))
 # per yard / move totals (used by the system comparison)
@@ -187,16 +191,23 @@ ISSUE = {'left_only': 'มีในรีพอตลาน แต่ไม่�
 if SYS:
     MOVEG = {'IEC': 'GATE IN', 'IED': 'GATE IN', 'IEP': 'GATE IN', 'OEV': 'GATE OUT', 'OEP': 'GATE OUT'}
     allsys = read_sys(SYS)
-    sd = allsys[allsys.Move.isin(MOVEG)]
+    sd = allsys[allsys.Move.isin(MOVEG) & allsys.Location.isin(det_all.Location.unique())]  # only yards reported today
     sysd = pd.DataFrame({'Location': sd.Location, 'Move': sd.Move.map(MOVEG), 'Cntr': sd['Container No'],
                          'TPSZ': sd.TPSZ, 'Code': sd.Move, 'GateTime': sd.GateTime})
     yd = pd.DataFrame(yard_cntrs, columns=['Yard', 'Location', 'Move', 'Cntr', 'TPSZ', 'Detail', 'File', 'Type', 'Ref'])
+    # a system export may cover only some locations (e.g. 10-8-LCH27.xls): compare only the locations it contains
+    COVERED = set(allsys.Location.dropna())
+    not_cov = sorted(set(det_all.Location) - COVERED)
+    if not_cov: print('NO SYSTEM DATA (ไม่เทียบ):', not_cov)
+    yd = yd[yd.Location.isin(COVERED)]
+    res_cmp = res[res.Location.isin(COVERED)]
     m = yd.merge(sysd, on=['Location', 'Move', 'Cntr'], how='outer', suffixes=('_yard', '_sys'), indicator=True)
     c3 = wb.create_sheet('Compare System')
     c3['A1'] = f'Yard report vs System ({os.path.basename(SYS)})  —  {DATE}'; c3['A1'].font = Font(bold=True, size=14)
     c3.append([]); c3.append(['Yard', 'Location', 'Move', 'Source'] + TPSZ + ['Total']); h = c3.max_row
     style(c3[h], font=Font(bold=True, color='FFFFFF'), fill=PatternFill('solid', fgColor='1F4E78'), alignment=Alignment(horizontal='center'))
-    for _, r in res.iterrows():
+    if not_cov: c3['A2'] = 'ไม่มีข้อมูลระบบ (ไม่ได้เทียบ): ' + ', '.join(not_cov)
+    for _, r in res_cmp.iterrows():
         sc = sysd[(sysd.Location == r.Location) & (sysd.Move == r.Move)].TPSZ.value_counts()
         base = c3.max_row + 1
         c3.append([r.Yard, r.Location, r.Move, 'YARD'] + [int(r[t]) for t in TPSZ])
@@ -309,7 +320,7 @@ for name, loc, move, cn, tp, det, f, cat, ref in yard_cntrs:
     db_moves.append({'Date': gate_date, 'Yard': name, 'Location': loc, 'Move': move, 'Type': cat, 'Container No': cn,
                      'TPSZ': tp, 'Customer': next((d[k].strip() for k in NAME_KEYS if k in d), ''),
                      'Booking / Job ref': ref, 'Gate Time': next((str(d[k]).strip() for k in TIME_KEYS if k in d), ''),
-                     'System Check': check.get((loc, move, cn), 'ไม่มีไฟล์ระบบ' if not SYS else ''), 'Source File': f})
+                     'System Check': check.get((loc, move, cn), 'ไม่มีไฟล์ระบบ' if not SYS or loc not in COVERED else ''), 'Source File': f})
 db_new = {
     'Container Moves': pd.DataFrame(db_moves),
     'Daily Summary': det_all.drop(columns='Source').assign(Date=gate_date)[['Date', 'Yard', 'Location', 'Move', 'Type'] + TPSZ + ['Total']],
@@ -318,7 +329,7 @@ if SYS:
     sys_tot = sysd.groupby(['Location', 'Move']).size()
     db_new['System Compare'] = pd.DataFrame([{'Date': gate_date, 'Yard': r.Yard, 'Location': r.Location, 'Move': r.Move,
                                               'Yard Total': int(r.Total), 'System Total': int(sys_tot.get((r.Location, r.Move), 0)),
-                                              'Diff': int(r.Total) - int(sys_tot.get((r.Location, r.Move), 0))} for _, r in res.iterrows()])
+                                              'Diff': int(r.Total) - int(sys_tot.get((r.Location, r.Move), 0))} for _, r in res_cmp.iterrows()])
     db_new['Diff'] = pd.DataFrame(DIFF_ROWS).drop(columns=['Yard report detail', 'System detail'], errors='ignore').assign(Date=gate_date) \
         if DIFF_ROWS else pd.DataFrame(columns=['Date'])
 DB = os.path.join(GM, 'GATE MOVE DATABASE.xlsx')
@@ -352,7 +363,8 @@ if os.path.exists(TPL):
         'tpsz': TPSZ,
         'yards': [{'name': n, 'loc': l} for n, l, *_ in YARDS],
         'moves': [[ds(r['Date']), r['Yard'], r['Location'], r['Move'], r['Type'], r['Container No'], r['TPSZ'],
-                   str(r['Customer']), str(r['Booking / Job ref']), str(r['Gate Time']), str(r['System Check'])] for _, r in cmv.iterrows()],
+                   str(r['Customer']), str(r['Booking / Job ref']), str(r['Gate Time']),
+                   '' if r['System Check'] == 'ไม่มีไฟล์ระบบ' else str(r['System Check'])] for _, r in cmv.iterrows()],
         'compare': [[ds(r['Date']), r['Yard'], r['Location'], r['Move'], int(r['Yard Total']), int(r['System Total'])] for _, r in scp.iterrows()],
     }
     html = open(TPL, encoding='utf-8').read()
