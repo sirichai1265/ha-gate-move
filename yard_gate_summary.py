@@ -309,6 +309,8 @@ if SYS:
         for j, h in enumerate(['Location', 'Container No', 'Move', 'GateDate', 'GateTime', 'BL No']): xs.write(0, j, h)
         for i, row in enumerate(MISS_ROWS, 1):
             for j, v in enumerate(row): xs.write(i, j, str(v))
+        # column widths in pixels (Arial 10: 7 px per character unit, xlwt width = 1/256 unit)
+        for j, px in ((1, 110), (3, 76), (5, 146)): xs.col(j).width = round(px / 7 * 256)  # Container No, GateDate, BL No
         save_or_skip(MISS, lambda: xb.save(MISS))
         print(f'MISSING IN SYSTEM -> {MISS} ({len(MISS_ROWS)} ตู้)')
         for row in MISS_ROWS: print('   ', row)
