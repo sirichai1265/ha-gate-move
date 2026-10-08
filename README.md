@@ -31,7 +31,7 @@ Output, all in `Desktop\GATE MOVE`:
 
 - `<dd.mm.yyyy>\HA Gate In-Out Summary <dd.mm.yyyy>.xlsx`: per-yard and total summary, system compare, container list
 - `<dd.mm.yyyy>\HA Gate Diff <dd.mm.yyyy>.xlsx`: containers that differ from the system
-- `<dd.mm.yyyy>\<m>-<d>-MISSING.xls`: containers in the yard reports but not in the system, in the system upload layout (Location, Container No, Move, GateDate, GateTime, BL No). GATE OUT: OEV (OEP for `MT-…` jobs), BL No = booking / job no. GATE IN: IED (IEP for `I########` jobs), BL No left blank (import BL is not in the yard reports)
+- `<dd.mm.yyyy>\<m>-<d>-MISSING.xls`: containers in the yard reports but not in the system, in the system upload layout (Location, Container No, Move, GateDate, GateTime, BL No). GATE OUT: OEV (OEP for `MT-…` jobs), BL No = booking / job no. GATE IN: IED (IEP for `I########` jobs), BL No = the yard BKG# (HAST BKG#, CELLO BOOKING IN), blank when the yard leaves it empty
 - `GATE MOVE DATABASE.xlsx`: running database (re-running a day replaces that day)
 - `HA Gate Dashboard.html`: dashboard built from the database with `dashboard_template.html`
 

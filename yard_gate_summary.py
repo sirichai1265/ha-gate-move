@@ -264,22 +264,29 @@ if SYS:
     def move_code(move, typ, ref):
         if move == 'GATE OUT': return 'OEP' if ref.startswith('MT-') else 'OEV'
         return 'IEP' if re.match(r'^I\d{8}$', ref) else 'IED'
+    def bkg_in(r):  # GATE IN BL No = the yard's BKG# (HAST "BKG#", CELLO "BOOKING IN"), else the job no. found in the row
+        d = dict(p.split(': ', 1) for p in str(r.Detail).split(' | ') if ': ' in p)
+        v = next((d[k].strip() for k in ('BKG#', 'BOOKING IN') if str(d.get(k, '')).strip() not in ('', 'nan')), '')
+        return v or str(r.Ref or '')
     miss = m[m._merge == 'left_only']
     MISS_ROWS = [[r.Location, r.Cntr, move_code(r.Move, r.Type, str(r.Ref or '')), GATE_D.replace('-', ''),
-                  gate_hhmm(r.Detail), (str(r.Ref or '') if r.Move == 'GATE OUT' else '')[:16]] for _, r in miss.iterrows()]
+                  gate_hhmm(r.Detail), (str(r.Ref or '') if r.Move == 'GATE OUT' else bkg_in(r))[:16]] for _, r in miss.iterrows()]
 # Source sheet
 s2 = wb.create_sheet('Source Files'); s2.append(['Yard', 'Location', 'Move', 'Source file'])
 for _, r in res.iterrows(): s2.append([r.Yard, r.Location, r.Move, r.Source])
 if SYS: s2.append(['SYSTEM', '', '', os.path.basename(SYS)])
 s2.column_dimensions['D'].width = 60
 OUTDIR = os.path.join(GM, DAY); os.makedirs(OUTDIR, exist_ok=True)
+LOCKED_OUT = []  # output files open in Excel: skipped with a warning instead of stopping the run
+def save_or_skip(path, write):
+    try:
+        write(); print('saved', path)
+    except PermissionError:
+        LOCKED_OUT.append(os.path.basename(path)); print('LOCKED (เปิดอยู่ใน Excel ไม่ได้บันทึก):', path)
 out = os.path.join(OUTDIR, f'HA Gate In-Out Summary {DAY}.xlsx')
-wb.save(out); print('saved', out)
+save_or_skip(out, lambda: wb.save(out))
 # differences exported to their own workbook
-if SYS:
-    dx = pd.DataFrame(DIFF_ROWS, columns=['Yard', 'Location', 'Move', 'Container No', 'TPSZ (Yard)', 'TPSZ (System)', 'System Code',
-                                          'Issue', 'System moves (this container)', 'Yard report detail', 'System detail', 'Yard file'])
-    dout = os.path.join(OUTDIR, f'HA Gate Diff {DAY}.xlsx')
+def write_diff(dout, dx):
     with pd.ExcelWriter(dout, engine='openpyxl') as xw:
         dx.to_excel(xw, sheet_name='Diff', index=False, startrow=2)
         w = xw.sheets['Diff']
@@ -290,7 +297,11 @@ if SYS:
             for c in row: c.border = B; c.alignment = Alignment(vertical='top', wrap_text=c.column >= 9)
         for col, wd in zip('ABCDEFGHIJKL', (10, 9, 10, 14, 10, 12, 11, 28, 26, 60, 60, 40)): w.column_dimensions[col].width = wd
         w.freeze_panes = 'E4'; w.auto_filter.ref = f'A3:L{max(w.max_row, 3)}'
-    print('saved', dout)
+if SYS:
+    dx = pd.DataFrame(DIFF_ROWS, columns=['Yard', 'Location', 'Move', 'Container No', 'TPSZ (Yard)', 'TPSZ (System)', 'System Code',
+                                          'Issue', 'System moves (this container)', 'Yard report detail', 'System detail', 'Yard file'])
+    dout = os.path.join(OUTDIR, f'HA Gate Diff {DAY}.xlsx')
+    save_or_skip(dout, lambda: write_diff(dout, dx))
     import xlwt
     MISS = os.path.join(OUTDIR, f'{int(_mm)}-{int(_dd)}-MISSING.xls')
     if MISS_ROWS:
@@ -298,7 +309,7 @@ if SYS:
         for j, h in enumerate(['Location', 'Container No', 'Move', 'GateDate', 'GateTime', 'BL No']): xs.write(0, j, h)
         for i, row in enumerate(MISS_ROWS, 1):
             for j, v in enumerate(row): xs.write(i, j, str(v))
-        xb.save(MISS)
+        save_or_skip(MISS, lambda: xb.save(MISS))
         print(f'MISSING IN SYSTEM -> {MISS} ({len(MISS_ROWS)} ตู้)')
         for row in MISS_ROWS: print('   ', row)
     elif os.path.exists(MISS):
@@ -406,3 +417,5 @@ if locked:
     print('COPIED (ไฟล์เปิดอยู่ใน Excel ต้นฉบับยังอยู่บน Desktop ปิดไฟล์แล้วลบทิ้งได้):', locked)
 else:
     print('ALL FILES IN', OUTDIR)
+if LOCKED_OUT:
+    print('NOT SAVED (ปิดไฟล์ใน Excel แล้วรันใหม่):', LOCKED_OUT)
