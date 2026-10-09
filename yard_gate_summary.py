@@ -178,8 +178,11 @@ def raw_sheet(f):  # the sheet holding the raw move list (skips pivot sheets)
 _dd, _mm, _yy = DATE.split('/'); GATE_D = f'{_yy}-{_mm}-{_dd}'
 on_day = lambda d: pd.to_datetime(d['GateDate'], errors='coerce').dt.strftime('%Y-%m-%d') == GATE_D
 _cand = []
-for d in SEARCH:
-    for f in glob.glob(os.path.join(d, f'{int(_mm)}-{int(_dd)}-*.xls')):
+for d in dict.fromkeys(SEARCH):
+    # in a source folder given on the command line any .xls may be the system export (e.g. "5555.xls")
+    pats = ['*.xls'] if SRC and d == SRC else [f'{int(_mm)}-{int(_dd)}-*.xls']
+    for f in {f for p in pats for f in glob.glob(os.path.join(d, p))}:
+        if os.path.basename(f).upper().endswith('-MISSING.XLS'): continue
         r = raw_sheet(f)
         if r is not None and on_day(r).any(): _cand.append(f)
 SYS = max(_cand, key=os.path.getmtime) if _cand else None
