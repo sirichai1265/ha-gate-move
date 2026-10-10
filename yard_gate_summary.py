@@ -21,7 +21,11 @@ TYPES = {'GATE IN': ['Consignee', 'Agent'], 'GATE OUT': ['Shipper', 'Agent']}
 def classify(move, cells):
     if move == 'GATE OUT':
         ref = next((x for x in cells if BOOKING.match(x)), None)
-        return ('Shipper', ref) if ref else ('Agent', next((x for x in cells if AGENT.match(x)), ''))
+        if ref: return ('Shipper', ref)
+        ref = next((x for x in cells if AGENT.match(x)), '')
+        if not ref:  # job no. inside a longer note, e.g. "OFF HIRE-HAST-OCT-04 // CELLO - GF //"
+            ref = next((m[0] for x in cells for m in [re.search(AGENT.pattern.strip('^$'), x)] if m), '')
+        return ('Agent', ref)
     ref = next((x for x in cells if AGENT.match(x)), None)
     return ('Agent', ref) if ref else ('Consignee', '')
 def file_date(f):  # dd/mm/yyyy from a report file name (dd.mm.yyyy / dd_mm_yyyy / yyyy-mm-dd)
