@@ -5,6 +5,10 @@ GM = os.path.join(D, "GATE MOVE")
 # Usage: python yard_gate_summary.py                        -> reports on Desktop (moved into GATE MOVE\<dd.mm.yyyy>)
 #        python yard_gate_summary.py 02.10.2026             -> re-run a day (Desktop + GATE MOVE\02.10.2026)
 #        python yard_gate_summary.py 01.10.2026 "<folder>"  -> reports in another folder (copied, originals kept)
+#        add --check                                        -> compare + MISSING only, into GATE MOVE\<day>\CHECK;
+#                                                              database, dashboard and reports on the Desktop are left as they are
+CHECK = '--check' in sys.argv
+sys.argv = [a for a in sys.argv if a != '--check']
 ARG_DATE = sys.argv[1] if len(sys.argv) > 1 else None
 SRC = sys.argv[2] if len(sys.argv) > 2 else None
 SEARCH = ([SRC] if SRC else [D]) + ([os.path.join(GM, ARG_DATE)] if ARG_DATE else [])
@@ -39,16 +43,16 @@ def file_date(f):  # dd/mm/yyyy from a report file name (dd.mm.yyyy / dd_mm_yyyy
     if m: return f'{m[1]}/{m[2]}/20{m[3]}'
 def g(p):
     for d in SEARCH:
-        m = sorted(glob.glob(os.path.join(d, p)))
+        m = glob.glob(os.path.join(d, p))
         if ARG_DATE: m = [f for f in m if file_date(f) in (None, ARG_DATE.replace('.', '/'))]
-        if m: return m[0]
+        if m: return max(m, key=os.path.getmtime)  # several reports for one day (1ST, 2ND, FINAL): newest wins
     return None
 YARDS = [  # name, loc, file pattern, gate-in sheet, gate-out sheet
  ('SMART BKK','BKK25','Report in-out H-A*.xlsx','GATE IN','GATE OUT'),
- ('BC','BKK27','*BC2_HeungA_Daily_Report*.xls','GATE IN','GATE OUT'),
+ ('BC','BKK27','*BC2*HeungA_Daily_Report*.xls','GATE IN','GATE OUT'),  # FINAL_BC2_…, BC2_1ST_…, BC2_2ND_…
  ('HAST','LCH27',('GATE IN *.xls','GATE OUT *.xls'),None,None),
  ('CELLO','LCH28','*CELLO*GATE IN_OUT*.xlsx','GATE IN REPORT','GATE OUT REPORT'),
- ('PW','LCHY5','*PW_HeungA_Daily_Report*.xls','GATE IN','GATE OUT'),
+ ('PW','LCHY5','*PW*HeungA_Daily_Report*.xls','GATE IN','GATE OUT'),   # FINAL_PW_…, PW_1ST_…, PW_2ND_…
 ]
 def sheet(f, name):
     x = pd.ExcelFile(f)
@@ -284,7 +288,7 @@ s2 = wb.create_sheet('Source Files'); s2.append(['Yard', 'Location', 'Move', 'So
 for _, r in res.iterrows(): s2.append([r.Yard, r.Location, r.Move, r.Source])
 if SYS: s2.append(['SYSTEM', '', '', os.path.basename(SYS)])
 s2.column_dimensions['D'].width = 60
-OUTDIR = os.path.join(GM, DAY); os.makedirs(OUTDIR, exist_ok=True)
+OUTDIR = os.path.join(GM, DAY, 'CHECK') if CHECK else os.path.join(GM, DAY); os.makedirs(OUTDIR, exist_ok=True)
 LOCKED_OUT = []  # output files open in Excel: skipped with a warning instead of stopping the run
 def save_or_skip(path, write):
     try:
@@ -324,6 +328,9 @@ if SYS:
         for row in MISS_ROWS: print('   ', row)
     elif os.path.exists(MISS):
         os.remove(MISS)  # an earlier run's list; nothing is missing any more
+if CHECK:  # check only: no database / dashboard update, reports stay where they are
+    if LOCKED_OUT: print('NOT SAVED (ปิดไฟล์ใน Excel แล้วรันใหม่):', LOCKED_OUT)
+    print('CHECK ONLY -> ' + OUTDIR + ' (ไม่บันทึก database / dashboard, ไม่ย้ายไฟล์)'); sys.exit(0)
 # ---------- running database: GATE MOVE\GATE MOVE DATABASE.xlsx (re-running a day replaces that day) ----------
 NAME_KEYS = ['Consignee', 'Customer Name', 'REPO/CONSIGNEE', 'Shippers', 'Shipper Name', 'SHIPPER', 'Shipper']
 TIME_KEYS = ['Time', 'TIME']
