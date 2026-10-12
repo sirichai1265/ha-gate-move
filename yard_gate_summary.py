@@ -12,10 +12,11 @@ sys.argv = [a for a in sys.argv if a != '--check']
 ARG_DATE = sys.argv[1] if len(sys.argv) > 1 else None
 SRC = sys.argv[2] if len(sys.argv) > 2 else None
 SEARCH = ([SRC] if SRC else [D]) + ([os.path.join(GM, ARG_DATE)] if ARG_DATE else [])
-TPSZ = ['22GP','42GP','45GP','22RE','45RE','22UT','42UT']
+TPSZ = ['22GP','42GP','45GP','22RE','45RE','22UT','42UT','22PC','42PC']
 MAP = {('20','GP'):'22GP',('40','GP'):'42GP',('40','HC'):'45GP',('20','DC'):'22GP',('40','DC'):'42GP',
        ('40','HQ'):'45GP',('20','RF'):'22RE',('40','RH'):'45RE',('20','RE'):'22RE',
-       ('20','OT'):'22UT',('40','OT'):'42UT',('20','UT'):'22UT',('40','UT'):'42UT'}  # open top
+       ('20','OT'):'22UT',('40','OT'):'42UT',('20','UT'):'22UT',('40','UT'):'42UT',
+       ('20','FR'):'22PC',('40','FR'):'42PC',('20','PC'):'22PC',('40','PC'):'42PC'}  # open top, flat rack
 CNTR = re.compile(r'^[A-Z]{4}\d{7}$')
 # GATE OUT: 16-char booking (HASLS00000000000) = Shipper, anything else (OFFHIRE-TWP-OCT-01, MT-TWP-SEP-28) = Agent
 BOOKING = re.compile(r'^[A-Z]{5}\d{11}$')
@@ -374,6 +375,9 @@ with pd.ExcelWriter(DB, engine='openpyxl') as xw:
         if 'Date' in out_df.columns:
             out_df['Date'] = pd.to_datetime(out_df['Date'])
             out_df = out_df[['Date'] + [c for c in out_df.columns if c != 'Date']].sort_values('Date', kind='stable')
+        if sh == 'Daily Summary':  # keep TPSZ columns in order (also after a TPSZ is added), empty = 0
+            out_df[TPSZ] = out_df.reindex(columns=TPSZ).fillna(0).astype(int)
+            out_df = out_df[['Date', 'Yard', 'Location', 'Move', 'Type'] + TPSZ + ['Total']]
         out_df.to_excel(xw, sheet_name=sh, index=False)
         w = xw.sheets[sh]
         for c in w[1]: c.font = Font(bold=True, color='FFFFFF'); c.fill = PatternFill('solid', fgColor='1F4E78')
