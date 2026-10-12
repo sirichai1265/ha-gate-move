@@ -25,7 +25,10 @@ System export: any `<m>-<d>-*.xls` (e.g. `10-2-GATE.xls`, `10-1-GAF2.xls`) with 
 python yard_gate_summary.py                                   # reports on the Desktop (moved into GATE MOVE\<dd.mm.yyyy>)
 python yard_gate_summary.py 02.10.2026                        # re-run a day already filed
 python yard_gate_summary.py 01.10.2026 "C:\path\to\folder"    # reports in another folder (copied, originals kept)
+python yard_gate_summary.py 12.10.2026 --check                # compare + MISSING only, into <day>\CHECK (no database / dashboard, files stay)
 ```
+
+BC and PW midday reports (`BC2_1ST_…`, `BC2_2ND_…`, `PW_1ST_…`, `PW_2ND_…`) are accepted; when a day has several reports for a yard, the newest file is used.
 
 Output, all in `Desktop\GATE MOVE`:
 
