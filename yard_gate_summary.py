@@ -182,6 +182,8 @@ SYS_COLS = {'Container No', 'Move', 'Location', 'TPSZ', 'GateDate'}
 def raw_sheet(f):  # the sheet holding the raw move list (skips pivot sheets)
     try:
         for sh, d in pd.read_excel(f, sheet_name=None).items():
+            if 'Location' not in d.columns and str(d.columns[0]).startswith('Unnamed'):  # blank Location header (10-15-ADDINF.xls)
+                d = d.rename(columns={d.columns[0]: 'Location'})
             if SYS_COLS <= set(map(str, d.columns)): return d
     except Exception:
         return None
@@ -195,11 +197,14 @@ for d in dict.fromkeys(SEARCH):
         if os.path.basename(f).upper().endswith('-MISSING.XLS'): continue
         r = raw_sheet(f)
         if r is not None and on_day(r).any(): _cand.append(f)
-SYS = max(_cand, key=os.path.getmtime) if _cand else None
-print('SYSTEM FILE:', os.path.basename(SYS) if SYS else 'ไม่พบ (ข้ามการเทียบกับระบบ)')
-def read_sys(f):
-    d = raw_sheet(f)
-    return d[on_day(d)]
+# all system files of the day are combined (e.g. 10-15-1700.xls for every location + 10-15-ADDINF.xls for LCHY5)
+SYS_ALL = sorted(set(_cand), key=os.path.getmtime)
+SYS = SYS_ALL[-1] if SYS_ALL else None
+SYS_NAME = ' + '.join(os.path.basename(f) for f in SYS_ALL)
+print('SYSTEM FILE:', SYS_NAME or 'ไม่พบ (ข้ามการเทียบกับระบบ)')
+def read_sys(_):
+    d = pd.concat([r[on_day(r)] for r in map(raw_sheet, SYS_ALL)], ignore_index=True)
+    return d.drop_duplicates(['Location', 'Container No', 'Move', 'GateTime'], keep='last')  # newest file wins
 ISSUE = {'left_only': 'มีในรีพอตลาน แต่ไม่มีในระบบ', 'right_only': 'มีในระบบ แต่ไม่มีในรีพอตลาน'}
 if SYS:
     MOVEG = {'IEC': 'GATE IN', 'IED': 'GATE IN', 'IEP': 'GATE IN', 'OEV': 'GATE OUT', 'OEP': 'GATE OUT'}
@@ -216,7 +221,7 @@ if SYS:
     res_cmp = res[res.Location.isin(COVERED)]
     m = yd.merge(sysd, on=['Location', 'Move', 'Cntr'], how='outer', suffixes=('_yard', '_sys'), indicator=True)
     c3 = wb.create_sheet('Compare System')
-    c3['A1'] = f'Yard report vs System ({os.path.basename(SYS)})  —  {DATE}'; c3['A1'].font = Font(bold=True, size=14)
+    c3['A1'] = f'Yard report vs System ({SYS_NAME})  —  {DATE}'; c3['A1'].font = Font(bold=True, size=14)
     c3.append([]); c3.append(['Yard', 'Location', 'Move', 'Source'] + TPSZ + ['Total']); h = c3.max_row
     style(c3[h], font=Font(bold=True, color='FFFFFF'), fill=PatternFill('solid', fgColor='1F4E78'), alignment=Alignment(horizontal='center'))
     if not_cov: c3['A2'] = 'ไม่มีข้อมูลระบบ (ไม่ได้เทียบ): ' + ', '.join(not_cov)
@@ -287,7 +292,7 @@ if SYS:
 # Source sheet
 s2 = wb.create_sheet('Source Files'); s2.append(['Yard', 'Location', 'Move', 'Source file'])
 for _, r in res.iterrows(): s2.append([r.Yard, r.Location, r.Move, r.Source])
-if SYS: s2.append(['SYSTEM', '', '', os.path.basename(SYS)])
+for f in SYS_ALL: s2.append(['SYSTEM', '', '', os.path.basename(f)])
 s2.column_dimensions['D'].width = 60
 OUTDIR = os.path.join(GM, DAY, 'CHECK') if CHECK else os.path.join(GM, DAY); os.makedirs(OUTDIR, exist_ok=True)
 LOCKED_OUT = []  # output files open in Excel: skipped with a warning instead of stopping the run
@@ -303,7 +308,7 @@ def write_diff(dout, dx):
     with pd.ExcelWriter(dout, engine='openpyxl') as xw:
         dx.to_excel(xw, sheet_name='Diff', index=False, startrow=2)
         w = xw.sheets['Diff']
-        w['A1'] = f'Yard report vs System ({os.path.basename(SYS)}) — differences {DATE}  :  {len(dx)} ตู้'
+        w['A1'] = f'Yard report vs System ({SYS_NAME}) — differences {DATE}  :  {len(dx)} ตู้'
         w['A1'].font = Font(bold=True, size=13)
         for c in w[3]: c.font = Font(bold=True, color='FFFFFF'); c.fill = PatternFill('solid', fgColor='C00000'); c.border = B
         for row in w.iter_rows(min_row=4, max_row=w.max_row):
@@ -427,7 +432,7 @@ if os.path.exists(TPL):
     print('PUBLIC (docs):', DOCS)
 # file all input reports into the day folder
 locked = []
-for f in dict.fromkeys(used_files + ([SYS] if SYS else [])):
+for f in dict.fromkeys(used_files + SYS_ALL):
     if os.path.dirname(os.path.abspath(f)) == os.path.abspath(OUTDIR): continue
     dst = os.path.join(OUTDIR, os.path.basename(f))
     if os.path.abspath(os.path.dirname(f)) != os.path.abspath(D):  # from another folder: copy, keep the original
