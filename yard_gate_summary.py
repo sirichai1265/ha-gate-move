@@ -204,7 +204,11 @@ SYS_NAME = ' + '.join(os.path.basename(f) for f in SYS_ALL)
 print('SYSTEM FILE:', SYS_NAME or 'ไม่พบ (ข้ามการเทียบกับระบบ)')
 def read_sys(_):
     d = pd.concat([r[on_day(r)] for r in map(raw_sheet, SYS_ALL)], ignore_index=True)
-    return d.drop_duplicates(['Location', 'Container No', 'Move', 'GateTime'], keep='last')  # newest file wins
+    # same move in several files (gate time or code may have been corrected, e.g. OEV -> OEP): keep the newest file's row
+    cnt = d.Move.isin(['IEC', 'IED', 'IEP', 'OEV', 'OEP'])
+    d = d.assign(_dir=d.Move.str[0])
+    d = pd.concat([d[~cnt], d[cnt].drop_duplicates(['Location', 'Container No', '_dir'], keep='last')])
+    return d.drop(columns='_dir')
 ISSUE = {'left_only': 'มีในรีพอตลาน แต่ไม่มีในระบบ', 'right_only': 'มีในระบบ แต่ไม่มีในรีพอตลาน'}
 if SYS:
     MOVEG = {'IEC': 'GATE IN', 'IED': 'GATE IN', 'IEP': 'GATE IN', 'OEV': 'GATE OUT', 'OEP': 'GATE OUT'}
