@@ -292,6 +292,7 @@ if SYS:
     def bkg_in(r):  # GATE IN BL No = the yard's BKG# (HAST "BKG#", CELLO "BOOKING IN"), else the job no. found in the row
         d = dict(p.split(': ', 1) for p in str(r.Detail).split(' | ') if ': ' in p)
         v = next((d[k].strip() for k in ('BKG#', 'BOOKING IN') if str(d.get(k, '')).strip() not in ('', 'nan')), '')
+        if not re.fullmatch(r'[A-Z0-9][A-Z0-9 /-]{3,}', v): v = ''  # a note typed in the field (e.g. Thai damage remark) is not a number
         return v or str(r.Ref or '')
     miss = m[m._merge == 'left_only']
     MISS_ROWS = [[r.Location, r.Cntr, move_code(r.Move, r.Type, str(r.Ref or '')), GATE_D.replace('-', ''),
