@@ -194,9 +194,12 @@ for d in dict.fromkeys(SEARCH):
     # in a source folder given on the command line any .xls may be the system export (e.g. "5555.xls")
     pats = ['*.xls'] if SRC and d == SRC else [f'{int(_mm)}-{int(_dd)}-*.xls']
     for f in {f for p in pats for f in glob.glob(os.path.join(d, p))}:
-        if os.path.basename(f).upper().endswith('-MISSING.XLS'): continue
+        b = os.path.basename(f)
+        if b.upper().endswith('-MISSING.XLS'): continue
+        if re.match(r'^\d{1,2}-\d{1,2}-\d{1,2}-', b): continue  # date-range work files (e.g. 10-20-21-GATE.xls for STORAGE)
         r = raw_sheet(f)
-        if r is not None and on_day(r).any(): _cand.append(f)
+        # a daily system export holds (almost) only this date; multi-day files are something else
+        if r is not None and len(r) and on_day(r).mean() >= 0.95: _cand.append(f)
 # all system files of the day are combined (e.g. 10-15-1700.xls for every location + 10-15-ADDINF.xls for LCHY5)
 SYS_ALL = sorted(set(_cand), key=os.path.getmtime)
 SYS = SYS_ALL[-1] if SYS_ALL else None
