@@ -190,9 +190,10 @@ def raw_sheet(f):  # the sheet holding the raw move list (skips pivot sheets)
 _dd, _mm, _yy = DATE.split('/'); GATE_D = f'{_yy}-{_mm}-{_dd}'
 on_day = lambda d: pd.to_datetime(d['GateDate'], errors='coerce').dt.strftime('%Y-%m-%d') == GATE_D
 _cand = []
+_next = pd.Timestamp(GATE_D) + pd.Timedelta(days=1)  # exports pulled the next morning may carry the next day's date (10-22-GAGA.xls = 21/10)
 for d in dict.fromkeys(SEARCH):
     # in a source folder given on the command line any .xls may be the system export (e.g. "5555.xls")
-    pats = ['*.xls'] if SRC and d == SRC else [f'{int(_mm)}-{int(_dd)}-*.xls']
+    pats = ['*.xls'] if SRC and d == SRC else [f'{int(_mm)}-{int(_dd)}-*.xls', f'{_next.month}-{_next.day}-*.xls']
     for f in {f for p in pats for f in glob.glob(os.path.join(d, p))}:
         b = os.path.basename(f)
         if b.upper().endswith('-MISSING.XLS'): continue

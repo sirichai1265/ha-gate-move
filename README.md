@@ -10,7 +10,7 @@ Daily summary of empty-container GATE IN / GATE OUT for the Heung-A yards, check
 | CELLO | LCH28 | `FINAL CELLO H-A GATE IN_OUT <dd.mm.yyyy>.xlsx` (GATE IN REPORT / GATE OUT REPORT) |
 | PW | LCHY5 | `FINAL_PW_HeungA_Daily_Report_<dd_mm_yyyy>_*.xls` (GATE IN / GATE OUT) |
 
-System export: any `<m>-<d>-*.xls` (e.g. `10-2-GATE.xls`, `10-1-GAF2.xls`) with Location / Container No / Move / TPSZ / GateDate columns (a blank Location header is accepted). All system files of the day are combined; for the same move the newest file wins.
+System export: any `<m>-<d>-*.xls` (e.g. `10-2-GATE.xls`, `10-1-GAF2.xls`) with Location / Container No / Move / TPSZ / GateDate columns (a blank Location header is accepted). Files named with the next day's date (exports pulled the next morning) are also checked; only files whose rows are (almost) all of the run date count. All system files of the day are combined; for the same move the newest file wins.
 
 ## Rules
 
