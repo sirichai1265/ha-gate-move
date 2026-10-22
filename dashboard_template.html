@@ -92,6 +92,7 @@ td.zero { color: var(--ink-3); }
   </header>
 
   <div class="controls" role="region" aria-label="ตัวกรอง">
+    <label for="wk">สัปดาห์ <select id="wk"></select></label>
     <label for="dFrom">ตั้งแต่ <select id="dFrom"></select></label>
     <label for="dTo">ถึง <select id="dTo"></select></label>
     <div class="chips" id="yardChips" role="group" aria-label="ลาน"></div>
@@ -109,7 +110,10 @@ td.zero { color: var(--ink-3); }
     </section>
     <section class="panel">
       <div class="panel-head">
-        <h2>แนวโน้มรายวัน</h2>
+        <h2>แนวโน้ม</h2>
+        <div class="chips" id="trendMode" role="group" aria-label="แนวโน้มแบบ">
+          <button class="chip" data-m="day" aria-pressed="true">รายวัน</button><button class="chip" data-m="week" aria-pressed="false">รายสัปดาห์</button>
+        </div>
         <div class="legend"><span><i class="swatch" style="background:var(--in)"></i>GATE IN</span><span><i class="swatch" style="background:var(--out)"></i>GATE OUT</span></div>
       </div>
       <div class="chart" id="trendChart"></div>
@@ -148,12 +152,33 @@ const st = {from: DATES[DATES.length-1] || '', to: DATES[DATES.length-1] || '', 
 try { const s = JSON.parse(localStorage.getItem('gm-yard') || 'null'); if (s && (s === 'ALL' || YARDS.some(y => y.name === s))) st.yard = s; } catch (e) {}
 
 document.getElementById('updated').textContent = 'ข้อมูลถึง ' + fmtD(DATES[DATES.length-1]) + ' · อัปเดต ' + DATA.generated;
+// calendar weeks: Monday–Sunday, ISO week number
+const iso = t => new Date(t).toISOString().slice(0, 10);
+const mondayOf = d => { const t = Date.parse(d + 'T00:00:00Z'), dow = (new Date(t).getUTCDay() + 6) % 7; return iso(t - dow * 864e5); };
+const sundayOf = m => iso(Date.parse(m + 'T00:00:00Z') + 6 * 864e5);
+const isoWeek = d => { const t = new Date(Date.parse(d + 'T00:00:00Z')); t.setUTCDate(t.getUTCDate() + 3 - (t.getUTCDay() + 6) % 7); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); return 1 + Math.round(((t - y0) / 864e5 - 3 + (y0.getUTCDay() + 6) % 7) / 7); };
+const WEEKS = [...new Set(DATES.map(mondayOf))].sort();
+const wkLabel = m => `WK ${isoWeek(m)} · ${fmtD(m).slice(0, 5)}–${fmtD(sundayOf(m))}`;
+const wkSel = document.getElementById('wk');
+wkSel.innerHTML = '<option value="">เลือกเอง</option>' + WEEKS.slice().reverse().map(m => `<option value="${m}">${wkLabel(m)}</option>`).join('');
+const syncWeek = () => { const m = mondayOf(st.from); wkSel.value = WEEKS.includes(m) && st.from === DATES.find(d => d >= m) && st.to === [...DATES].reverse().find(d => d <= sundayOf(m)) ? m : ''; };
+wkSel.addEventListener('change', () => {
+  const m = wkSel.value; if (!m) return;
+  st.from = DATES.find(d => d >= m); st.to = [...DATES].reverse().find(d => d <= sundayOf(m));
+  dFrom.value = st.from; dTo.value = st.to; render();
+});
 for (const id of ['dFrom','dTo']) {
   const el = document.getElementById(id);
   el.innerHTML = DATES.map(d => `<option value="${d}">${fmtD(d)}</option>`).join('');
   el.value = id === 'dFrom' ? st.from : st.to;
-  el.addEventListener('change', () => { st.from = dFrom.value; st.to = dTo.value; if (st.from > st.to) { [st.from, st.to] = [st.to, st.from]; dFrom.value = st.from; dTo.value = st.to; } render(); });
+  el.addEventListener('change', () => { st.from = dFrom.value; st.to = dTo.value; if (st.from > st.to) { [st.from, st.to] = [st.to, st.from]; dFrom.value = st.from; dTo.value = st.to; } syncWeek(); render(); });
 }
+syncWeek();
+let trendMode = 'day';
+document.getElementById('trendMode').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return; trendMode = b.dataset.m;
+  document.querySelectorAll('#trendMode .chip').forEach(c => c.setAttribute('aria-pressed', c === b)); renderTrend();
+});
 const chipsEl = document.getElementById('yardChips');
 function drawChips() {
   chipsEl.innerHTML = [{name:'ALL', loc:'ทุกลาน'}].concat(YARDS).map(y =>
@@ -219,11 +244,15 @@ function renderYardChart(rows) {
 function renderTrend() {
   const el = document.getElementById('trendChart');
   const days = DATES.filter(d => d >= st.from && d <= st.to);
-  const pts = days.map(d => { const r = M.filter(x => x.d === d && inYard(x)); return {d, i: count(r, x => x.move === 'GATE IN'), o: count(r, x => x.move === 'GATE OUT')}; });
+  const wk = trendMode === 'week';
+  const keys = wk ? [...new Set(days.map(mondayOf))] : days;
+  const pts = keys.map(k => { const r = M.filter(x => (wk ? mondayOf(x.d) === k : x.d === k) && inRange(x) && inYard(x));
+    return {d: k, lab: wk ? `WK ${isoWeek(k)}` : `${k.slice(8, 10)}/${k.slice(5, 7)}`, tip: wk ? wkLabel(k) + ` (${days.filter(d => mondayOf(d) === k).length} วันทำการ)` : fmtD(k),
+            i: count(r, x => x.move === 'GATE IN'), o: count(r, x => x.move === 'GATE OUT')}; });
   if (pts.length < 2) {
-    const p = pts[0] || {i: 0, o: 0, d: st.to};
-    el.innerHTML = `<div class="empty">กราฟแนวโน้มจะแสดงเมื่อเลือกช่วงที่มีข้อมูลตั้งแต่ 2 วันขึ้นไป (ตอนนี้มีข้อมูล ${DATES.length} วัน).<br>
-      วันที่ ${fmtD(p.d)}: GATE IN <b class="num">${p.i}</b> · GATE OUT <b class="num">${p.o}</b></div>`;
+    const p = pts[0] || {i: 0, o: 0, tip: fmtD(st.to)};
+    el.innerHTML = `<div class="empty">กราฟแนวโน้มจะแสดงเมื่อเลือกช่วงที่มี${wk ? 'ตั้งแต่ 2 สัปดาห์' : 'ข้อมูลตั้งแต่ 2 วัน'}ขึ้นไป<br>
+      ${esc(p.tip)}: GATE IN <b class="num">${p.i}</b> · GATE OUT <b class="num">${p.o}</b></div>`;
     return;
   }
   const W = Math.max(300, el.clientWidth), H = 230, L = 34, R = 12, T = 12, B = 26;
@@ -233,19 +262,19 @@ function renderTrend() {
   let s = '';
   for (let t = 0; t <= top; t += step) s += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text x="${L - 6}" y="${y(t)}" text-anchor="end" dominant-baseline="middle" class="num">${t}</text>`;
   const every = Math.ceil(pts.length / Math.max(2, Math.floor((W - L) / 70)));
-  pts.forEach((p, k) => { if (k % every === 0 || k === pts.length - 1) s += `<text x="${x(k)}" y="${H - 6}" text-anchor="middle" class="num" style="font-size:11px">${p.d.slice(8, 10)}/${p.d.slice(5, 7)}</text>`; });
+  pts.forEach((p, k) => { if (k % every === 0 || k === pts.length - 1) s += `<text x="${x(k)}" y="${H - 6}" text-anchor="middle" class="num" style="font-size:11px">${p.lab}</text>`; });
   for (const [key, col] of [['i', 'var(--in)'], ['o', 'var(--out)']]) {
     s += `<path d="${pts.map((p, k) => (k ? 'L' : 'M') + x(k) + ',' + y(p[key])).join(' ')}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
     const k = pts.length - 1; s += `<circle cx="${x(k)}" cy="${y(pts[k][key])}" r="4" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`;
   }
   s += `<line id="xh" class="grid" x1="0" x2="0" y1="${T}" y2="${H - B}" style="stroke:var(--ink-3)" visibility="hidden"/><rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" id="hit"/>`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="แนวโน้มรายวัน">${s}</svg>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="แนวโน้ม">${s}</svg>`;
   const tip = tipFor(el), hit = el.querySelector('#hit'), xh = el.querySelector('#xh');
   hit.addEventListener('mousemove', e => {
     const bx = el.getBoundingClientRect(), sx = (e.clientX - bx.left) * W / bx.width;
     const k = Math.max(0, Math.min(pts.length - 1, Math.round((sx - L) / ((W - L - R) / (pts.length - 1))))), p = pts[k];
     xh.setAttribute('x1', x(k)); xh.setAttribute('x2', x(k)); xh.setAttribute('visibility', 'visible');
-    tip.innerHTML = `${fmtD(p.d)}<br><i class="swatch" style="background:var(--in)"></i>GATE IN <b>${p.i}</b><br><i class="swatch" style="background:var(--out)"></i>GATE OUT <b>${p.o}</b>`;
+    tip.innerHTML = `${esc(p.tip)}<br><i class="swatch" style="background:var(--in)"></i>GATE IN <b>${p.i}</b><br><i class="swatch" style="background:var(--out)"></i>GATE OUT <b>${p.o}</b>`;
     tip.style.left = (x(k) * bx.width / W) + 'px'; tip.style.top = (y(Math.max(p.i, p.o)) * bx.height / H) + 'px'; tip.hidden = false;
   });
   hit.addEventListener('mouseleave', () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); });
