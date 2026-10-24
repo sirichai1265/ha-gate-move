@@ -10,3 +10,7 @@ __pycache__/
 
 # public build for GitHub Pages is allowed
 !docs/gate-move-summary.xlsx
+
+# never publish archives or ad-hoc copies
+*.zip
+* - Copy*
