@@ -457,3 +457,9 @@ else:
     print('ALL FILES IN', OUTDIR)
 if LOCKED_OUT:
     print('NOT SAVED (ปิดไฟล์ใน Excel แล้วรันใหม่):', LOCKED_OUT)
+# ---------- EQ STAYING: ตัดยอดและสรุปตู้ปล่อยออกของแต่ละวัน (ใช้ GATE MOVE DATABASE ที่เพิ่งอัปเดต) ----------
+EQS = os.path.join(D, 'EQ STAYING', 'build_dashboard.py')
+if os.path.exists(EQS):
+    import subprocess
+    print('EQ STAYING: ตัดยอดตู้ปล่อยออก ...')
+    subprocess.run([sys.executable, EQS], cwd=os.path.dirname(EQS))
