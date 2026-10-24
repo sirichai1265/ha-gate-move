@@ -16,7 +16,7 @@ System export: any `<m>-<d>-*.xls` (e.g. `10-2-GATE.xls`, `10-1-GAF2.xls`) with 
 
 - TPSZ: 22GP, 42GP, 45GP, 22RE, 45RE, 22UT, 42UT, 22PC, 42PC (20'GP/DC → 22GP, 40'GP/DC → 42GP, 40'HC/HQ → 45GP, 20'RF/RE → 22RE, 40'RH → 45RE, 20'/40' OT → 22UT/42UT, 20'/40' FR → 22PC/42PC)
 - GATE IN = IEC, IED, IEP · GATE OUT = OEV, OEP · IER / OER are not counted
-- GATE IN: Agent when the row has a haulage / shore job no. (`MT-TWP-SEP-28`, `I20261725`, `26BI01624`, `HAL1009`, `HASLC0126090530`), otherwise Consignee
+- GATE IN: Agent when the row has a haulage / shore job no. (`MT-TWP-SEP-28`, `I20261725`, `26BI01624`, `HAL1009`, `HASLC0126090530`, `C3260577867`), otherwise Consignee
 - GATE OUT: Shipper when the row has a 16-character booking (`HASLS00000000000`), otherwise Agent
 
 ## Run
@@ -27,6 +27,8 @@ python yard_gate_summary.py 02.10.2026                        # re-run a day alr
 python yard_gate_summary.py 01.10.2026 "C:\path\to\folder"    # reports in another folder (copied, originals kept)
 python yard_gate_summary.py 12.10.2026 --check                # compare + MISSING only, into <day>\CHECK (no database / dashboard, files stay)
 ```
+
+`corrections.csv` (local, git-ignored): `Date,Location,Move,Container No,TPSZ,Note` fixes a TPSZ the yard report got wrong (e.g. 20' DC that is really 22RE).
 
 BC and PW midday reports (`BC2_1ST_…`, `BC2_2ND_…`, `PW_1ST_…`, `PW_2ND_…`) are accepted; when a day has several reports for a yard, the newest file is used.
 

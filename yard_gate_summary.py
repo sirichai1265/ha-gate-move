@@ -22,7 +22,7 @@ CNTR = re.compile(r'^[A-Z]{4}\d{7}$')
 BOOKING = re.compile(r'^[A-Z]{5}\d{11}$')
 # GATE IN: haulage / shore job no. (MT-TWP-SEP-28, OFFHIRE-.., I20261725, 26BI01624) = Agent, customer name = Consignee
 # also "OFF HIRE-HAST-OCT-01"; PW puts HAL1009 / HAL10011 (HAL + 4-5 digits, seals are HAL + 6) and 15-char HASLC0126090530
-AGENT = re.compile(r'^(?:[A-Z]+(?: [A-Z]+)?(?:-[A-Z0-9]+){2,}|I\d{8}|\d{2}[A-Z]{2}\d{3,}|HAL\d{4,5}|HASL[A-Z]\d{10})$')
+AGENT = re.compile(r'^(?:[A-Z]+(?: [A-Z]+)?(?:-[A-Z0-9]+){2,}|I\d{8}|\d{2}[A-Z]{2}\d{3,}|HAL\d{4,5}|HASL[A-Z]\d{10}|C\d{10})$')  # C3260577867 (PW)
 TYPES = {'GATE IN': ['Consignee', 'Agent'], 'GATE OUT': ['Shipper', 'Agent']}
 def classify(move, cells):
     if move == 'GATE OUT':
@@ -60,7 +60,7 @@ def sheet(f, name):
     if name is None: return pd.read_excel(x, x.sheet_names[0], header=None)
     s = next(s for s in x.sheet_names if s.strip().upper() == name)
     return pd.read_excel(x, s, header=None)
-def parse(df, move):
+def parse(df, move, corr=None):
     out, bad, cl = Counter(), [], []
     hdr = {}
     for _, r in df.iterrows():
@@ -77,11 +77,15 @@ def parse(df, move):
                 if not typ: typ = next(x for x in v[j+1:] if re.match(r'^[A-Z]{2}$', x))
                 break
         k = MAP.get((size, typ))
+        k = (corr or {}).get(v[idx], k)  # TPSZ fixed by hand in corrections.csv
         cat, ref = classify(move, v)
         if k: out[(cat, k)] += 1; cl.append((v[idx], k, cat, ref, ' | '.join(f'{hdr.get(c, c)}: {x}' for c, x in r.items() if pd.notna(x))))
         elif v[idx] not in {c[0] for c in cl}: bad.append((v[idx], size, typ))  # stray repeat of a listed container: ignore
     return out, bad, cl
 rows, issues, yard_cntrs, used_files, skipped = [], [], [], [], []
+# corrections.csv (local only): Date dd/mm/yyyy, Location, Move, Container No, TPSZ, Note -> fixes a yard report's wrong type
+_cf = os.path.join(GM, 'corrections.csv')
+CORR = pd.read_csv(_cf, dtype=str).fillna('') if os.path.exists(_cf) else pd.DataFrame(columns=['Date', 'Location', 'Move', 'Container No', 'TPSZ'])
 for name, loc, pat, si, so in YARDS:
     if isinstance(pat, tuple): fi, fo = g(pat[0]), g(pat[1])
     else: fi = fo = g(pat)
@@ -89,7 +93,10 @@ for name, loc, pat, si, so in YARDS:
         print(f'SKIP: ไม่พบไฟล์รีพอตของลาน {name} ({pat})'); skipped.append(name); continue
     used_files += [fi, fo]
     for move, f, s in (('GATE IN', fi, si), ('GATE OUT', fo, so)):
-        c, bad, cl = parse(sheet(f, s), move)
+        _fd = file_date(f) or (ARG_DATE or '').replace('.', '/')
+        _c = CORR[(CORR.Date == _fd) & (CORR.Location == loc) & (CORR.Move == move)]
+        if len(_c): print('CORRECTION:', loc, move, dict(zip(_c['Container No'], _c.TPSZ)))
+        c, bad, cl = parse(sheet(f, s), move, dict(zip(_c['Container No'], _c.TPSZ)))
         yard_cntrs += [(name, loc, move, cn, tp, det, os.path.basename(f), cat, ref) for cn, tp, cat, ref, det in cl]
         for cat in TYPES[move]:
             rows.append({'Yard': name, 'Location': loc, 'Move': move, 'Type': cat, **{t: c.get((cat, t), 0) for t in TPSZ},
