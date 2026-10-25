@@ -91,28 +91,28 @@ td.zero { color: var(--ink-3); }
     <div class="sub" id="updated"></div>
   </header>
 
-  <div class="controls" role="region" aria-label="ตัวกรอง">
-    <label for="wk">สัปดาห์ <select id="wk"></select></label>
-    <label for="dFrom">ตั้งแต่ <select id="dFrom"></select></label>
-    <label for="dTo">ถึง <select id="dTo"></select></label>
-    <div class="chips" id="yardChips" role="group" aria-label="ลาน"></div>
+  <div class="controls" role="region" aria-label="Filters">
+    <label for="wk">Week <select id="wk"></select></label>
+    <label for="dFrom">From <select id="dFrom"></select></label>
+    <label for="dTo">To <select id="dTo"></select></label>
+    <div class="chips" id="yardChips" role="group" aria-label="Yard"></div>
   </div>
 
-  <section class="kpis" id="kpis" aria-label="สรุป"></section>
+  <section class="kpis" id="kpis" aria-label="Summary"></section>
 
   <div class="grid2">
     <section class="panel">
       <div class="panel-head">
-        <h2>ตู้เข้า / ตู้ออก แยกลาน</h2>
+        <h2>Gate In / Gate Out by Yard</h2>
         <div class="legend"><span><i class="swatch" style="background:var(--in)"></i>GATE IN</span><span><i class="swatch" style="background:var(--out)"></i>GATE OUT</span></div>
       </div>
       <div class="chart" id="yardChart"></div>
     </section>
     <section class="panel">
       <div class="panel-head">
-        <h2>แนวโน้ม</h2>
-        <div class="chips" id="trendMode" role="group" aria-label="แนวโน้มแบบ">
-          <button class="chip" data-m="day" aria-pressed="true">รายวัน</button><button class="chip" data-m="week" aria-pressed="false">รายสัปดาห์</button>
+        <h2>Trend</h2>
+        <div class="chips" id="trendMode" role="group" aria-label="Trend by">
+          <button class="chip" data-m="day" aria-pressed="true">Daily</button><button class="chip" data-m="week" aria-pressed="false">Weekly</button>
         </div>
         <div class="legend"><span><i class="swatch" style="background:var(--in)"></i>GATE IN</span><span><i class="swatch" style="background:var(--out)"></i>GATE OUT</span></div>
       </div>
@@ -122,15 +122,15 @@ td.zero { color: var(--ink-3); }
 
   <section class="panel">
     <div class="panel-head">
-      <h2>สรุปตาม TPSZ</h2>
-      <span class="note">GATE IN = IEC, IED, IEP · GATE OUT = OEV, OEP (ไม่นับ IER, OER) · Consignee = ชื่อลูกค้า · Shipper = Booking 16 ตัว · Agent = เลขงานหัวลาก/ชอร์</span>
+      <h2>Summary by TPSZ</h2>
+      <span class="note">GATE IN = IEC, IED, IEP · GATE OUT = OEV, OEP (IER, OER not counted) · Consignee = customer name · Shipper = 16-character booking · Agent = haulage / shore job no.</span>
     </div>
     <div class="scroll"><table id="tpszTable"></table></div>
   </section>
 
   <section class="panel">
     <div class="panel-head">
-      <h2>เทียบกับระบบ</h2>
+      <h2>System Check</h2>
       <span id="sysPill"></span>
     </div>
     <div class="scroll"><table id="sysTable"></table></div>
@@ -146,12 +146,13 @@ const M = DATA.moves.map(r => ({d:r[0], yard:r[1], loc:r[2], move:r[3], type:r[4
 const C = DATA.compare.map(r => ({d:r[0], yard:r[1], loc:r[2], move:r[3], y:r[4], s:r[5]}));
 const DATES = [...new Set(M.map(r => r.d).concat(C.map(r => r.d)))].sort();
 const YARDS = DATA.yards;
+const ISSUE_EN = {'มีในรีพอตลาน แต่ไม่มีในระบบ': 'In yard report, not in system', 'มีในระบบ แต่ไม่มีในรีพอตลาน': 'In system, not in yard report', 'TPSZ ไม่ตรงกัน': 'TPSZ mismatch'};
 const fmtD = d => d ? d.slice(8,10) + '/' + d.slice(5,7) + '/' + d.slice(0,4) : '';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const st = {from: DATES[DATES.length-1] || '', to: DATES[DATES.length-1] || '', yard: 'ALL'};
 try { const s = JSON.parse(localStorage.getItem('gm-yard') || 'null'); if (s && (s === 'ALL' || YARDS.some(y => y.name === s))) st.yard = s; } catch (e) {}
 
-document.getElementById('updated').textContent = 'ข้อมูลถึง ' + fmtD(DATES[DATES.length-1]) + ' · อัปเดต ' + DATA.generated;
+document.getElementById('updated').textContent = 'Data to ' + fmtD(DATES[DATES.length-1]) + ' · Updated ' + DATA.generated;
 // calendar weeks: Monday–Sunday, ISO week number
 const iso = t => new Date(t).toISOString().slice(0, 10);
 const mondayOf = d => { const t = Date.parse(d + 'T00:00:00Z'), dow = (new Date(t).getUTCDay() + 6) % 7; return iso(t - dow * 864e5); };
@@ -160,7 +161,7 @@ const isoWeek = d => { const t = new Date(Date.parse(d + 'T00:00:00Z')); t.setUT
 const WEEKS = [...new Set(DATES.map(mondayOf))].sort();
 const wkLabel = m => `WK ${isoWeek(m)} · ${fmtD(m).slice(0, 5)}–${fmtD(sundayOf(m))}`;
 const wkSel = document.getElementById('wk');
-wkSel.innerHTML = '<option value="">เลือกเอง</option>' + WEEKS.slice().reverse().map(m => `<option value="${m}">${wkLabel(m)}</option>`).join('');
+wkSel.innerHTML = '<option value="">Custom</option>' + WEEKS.slice().reverse().map(m => `<option value="${m}">${wkLabel(m)}</option>`).join('');
 const syncWeek = () => { const m = mondayOf(st.from); wkSel.value = WEEKS.includes(m) && st.from === DATES.find(d => d >= m) && st.to === [...DATES].reverse().find(d => d <= sundayOf(m)) ? m : ''; };
 wkSel.addEventListener('change', () => {
   const m = wkSel.value; if (!m) return;
@@ -181,8 +182,8 @@ document.getElementById('trendMode').addEventListener('click', e => {
 });
 const chipsEl = document.getElementById('yardChips');
 function drawChips() {
-  chipsEl.innerHTML = [{name:'ALL', loc:'ทุกลาน'}].concat(YARDS).map(y =>
-    `<button class="chip" data-y="${esc(y.name)}" aria-pressed="${st.yard === y.name}">${y.name === 'ALL' ? 'ทุกลาน' : esc(y.name) + ' <span class="num" style="opacity:.7">' + esc(y.loc) + '</span>'}</button>`).join('');
+  chipsEl.innerHTML = [{name:'ALL', loc:'All yards'}].concat(YARDS).map(y =>
+    `<button class="chip" data-y="${esc(y.name)}" aria-pressed="${st.yard === y.name}">${y.name === 'ALL' ? 'All yards' : esc(y.name) + ' <span class="num" style="opacity:.7">' + esc(y.loc) + '</span>'}</button>`).join('');
 }
 chipsEl.addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; st.yard = b.dataset.y; try { localStorage.setItem('gm-yard', JSON.stringify(st.yard)); } catch (e) {} render(); });
 
@@ -201,10 +202,10 @@ function renderKpis(rows) {
       <span class="split"><span>Consignee <b>${count(gin, r => r.type === 'Consignee')}</b></span><span>Agent <b>${count(gin, r => r.type === 'Agent')}</b></span></span></div>
     <div class="kpi"><span class="eyebrow"><i class="swatch" style="background:var(--out)"></i>GATE OUT</span><span class="v">${gout.length}</span>
       <span class="split"><span>Shipper <b>${count(gout, r => r.type === 'Shipper')}</b></span><span>Agent <b>${count(gout, r => r.type === 'Agent')}</b></span></span></div>
-    <div class="kpi"><span class="eyebrow">รวม Move</span><span class="v">${rows.length}</span>
+    <div class="kpi"><span class="eyebrow">Total Moves</span><span class="v">${rows.length}</span>
       <span class="split"><span>20' <b>${count(rows, r => r.tpsz.startsWith('22'))}</b></span><span>40' <b>${count(rows, r => !r.tpsz.startsWith('22'))}</b></span><span>Reefer <b>${count(rows, r => r.tpsz.endsWith('RE'))}</b></span></span></div>
-    <div class="kpi"><span class="eyebrow">เทียบกับระบบ</span><span class="v">${hasSys ? diffCntr : '–'}<span style="font-size:14px;color:var(--ink-3);font-family:var(--font-ui)"> ตู้ไม่ตรง</span></span>
-      <span class="split">${!hasSys ? '<span>ไม่มีไฟล์ระบบในช่วงนี้</span>' : bad ? `<span class="pill bad">✕ ไม่ตรง ${bad} รายการ</span>` : '<span class="pill ok">✓ ตรงกันทั้งหมด</span>'}</span></div>`;
+    <div class="kpi"><span class="eyebrow">System Check</span><span class="v">${hasSys ? diffCntr : '–'}<span style="font-size:14px;color:var(--ink-3);font-family:var(--font-ui)"> mismatched</span></span>
+      <span class="split">${!hasSys ? '<span>No system file in this range</span>' : bad ? `<span class="pill bad">✕ ${bad} mismatch${bad > 1 ? 'es' : ''}</span>` : '<span class="pill ok">✓ All match</span>'}</span></div>`;
 }
 
 const tipFor = el => { let t = el.querySelector('.tip'); if (!t) { t = document.createElement('div'); t.className = 'tip'; t.hidden = true; el.appendChild(t); } return t; };
@@ -233,7 +234,7 @@ function renderYardChart(rows) {
     });
     s += '</g>';
   });
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="จำนวนตู้เข้าออกแยกลาน">${s}</svg>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gate in / gate out by yard">${s}</svg>`;
   const tip = tipFor(el);
   el.querySelectorAll('[data-tip]').forEach(r => {
     r.addEventListener('mousemove', e => { const [a, b, c] = r.dataset.tip.split('|'); tip.innerHTML = `${a}: <b>${b}</b><br>${c}`; const bx = el.getBoundingClientRect(); tip.style.left = (e.clientX - bx.left) + 'px'; tip.style.top = (e.clientY - bx.top) + 'px'; tip.hidden = false; });
@@ -247,11 +248,11 @@ function renderTrend() {
   const wk = trendMode === 'week';
   const keys = wk ? [...new Set(days.map(mondayOf))] : days;
   const pts = keys.map(k => { const r = M.filter(x => (wk ? mondayOf(x.d) === k : x.d === k) && inRange(x) && inYard(x));
-    return {d: k, lab: wk ? `WK ${isoWeek(k)}` : `${k.slice(8, 10)}/${k.slice(5, 7)}`, tip: wk ? wkLabel(k) + ` (${days.filter(d => mondayOf(d) === k).length} วันทำการ)` : fmtD(k),
+    return {d: k, lab: wk ? `WK ${isoWeek(k)}` : `${k.slice(8, 10)}/${k.slice(5, 7)}`, tip: wk ? wkLabel(k) + ` (${days.filter(d => mondayOf(d) === k).length} working days)` : fmtD(k),
             i: count(r, x => x.move === 'GATE IN'), o: count(r, x => x.move === 'GATE OUT')}; });
   if (pts.length < 2) {
     const p = pts[0] || {i: 0, o: 0, tip: fmtD(st.to)};
-    el.innerHTML = `<div class="empty">กราฟแนวโน้มจะแสดงเมื่อเลือกช่วงที่มี${wk ? 'ตั้งแต่ 2 สัปดาห์' : 'ข้อมูลตั้งแต่ 2 วัน'}ขึ้นไป<br>
+    el.innerHTML = `<div class="empty">The trend chart needs a range with ${wk ? 'at least 2 weeks' : 'at least 2 days of data'}<br>
       ${esc(p.tip)}: GATE IN <b class="num">${p.i}</b> · GATE OUT <b class="num">${p.o}</b></div>`;
     return;
   }
@@ -268,7 +269,7 @@ function renderTrend() {
     const k = pts.length - 1; s += `<circle cx="${x(k)}" cy="${y(pts[k][key])}" r="4" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`;
   }
   s += `<line id="xh" class="grid" x1="0" x2="0" y1="${T}" y2="${H - B}" style="stroke:var(--ink-3)" visibility="hidden"/><rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" id="hit"/>`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="แนวโน้ม">${s}</svg>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Trend">${s}</svg>`;
   const tip = tipFor(el), hit = el.querySelector('#hit'), xh = el.querySelector('#xh');
   hit.addEventListener('mousemove', e => {
     const bx = el.getBoundingClientRect(), sx = (e.clientX - bx.left) * W / bx.width;
@@ -287,15 +288,15 @@ function renderTpsz(rows) {
   const all = []; ys.forEach(y => Object.entries(types).forEach(([mv, ts]) => ts.forEach(tp => all.push(...T.map(t => cell(rows.filter(r => r.yard === y.name && r.move === mv && r.type === tp), t))))));
   const max = Math.max(1, ...all);
   const td = v => `<td class="n${v ? '' : ' zero'}" style="background:${v ? `rgba(var(--heat-rgb),${(0.08 + 0.42 * v / max).toFixed(2)})` : 'transparent'}">${v}</td>`;
-  let h = `<thead><tr><th>ลาน</th><th>Move</th><th>Type</th>${T.map(t => `<th class="n">${t}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>`;
+  let h = `<thead><tr><th>Yard</th><th>Move</th><th>Type</th>${T.map(t => `<th class="n">${t}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>`;
   const line = (cls, a, b, c, list, heat) => `<tr class="${cls}"><td>${a}</td><td>${b}</td><td>${c}</td>${T.map(t => heat ? td(cell(list, t)) : `<td class="n">${cell(list, t)}</td>`).join('')}<td class="n"><b>${list.length}</b></td></tr>`;
   ys.forEach(y => Object.entries(types).forEach(([mv, ts]) => {
     const base = rows.filter(r => r.yard === y.name && r.move === mv);
     const mvh = `<span class="mv ${mv === 'GATE IN' ? 'in' : 'out'}">${mv}</span>`;
     ts.forEach(tp => h += line('', `${esc(y.name)} <span class="note num">${esc(y.loc)}</span>`, mvh, tp, base.filter(r => r.type === tp), true));
-    h += line('sub-total', esc(y.name), mvh, 'รวม', base, false);
+    h += line('sub-total', esc(y.name), mvh, 'Total', base, false);
   }));
-  if (ys.length > 1) for (const mv of Object.keys(types)) h += line('grand', 'รวมทุกลาน', `<span class="mv ${mv === 'GATE IN' ? 'in' : 'out'}">${mv}</span>`, '', rows.filter(r => r.move === mv), false);
+  if (ys.length > 1) for (const mv of Object.keys(types)) h += line('grand', 'All yards', `<span class="mv ${mv === 'GATE IN' ? 'in' : 'out'}">${mv}</span>`, '', rows.filter(r => r.move === mv), false);
   document.getElementById('tpszTable').innerHTML = h + '</tbody>';
 }
 
@@ -305,13 +306,13 @@ function renderSys(rows) {
   cmp.forEach(r => { const k = r.yard + '|' + r.move; (agg[k] = agg[k] || {yard: r.yard, loc: r.loc, move: r.move, y: 0, s: 0}); agg[k].y += r.y; agg[k].s += r.s; });
   const list = Object.values(agg);
   const bad = list.filter(r => r.y !== r.s).length;
-  document.getElementById('sysPill').innerHTML = !list.length ? '<span class="note">ไม่มีไฟล์ระบบในช่วงนี้</span>' : bad ? `<span class="pill bad">✕ ไม่ตรง ${bad} รายการ</span>` : '<span class="pill ok">✓ ตรงกันทั้งหมด</span>';
-  document.getElementById('sysTable').innerHTML = list.length ? `<thead><tr><th>ลาน</th><th>Location</th><th>Move</th><th class="n">รีพอตลาน</th><th class="n">ระบบ</th><th class="n">ต่าง</th><th>สถานะ</th></tr></thead><tbody>` +
-    list.map(r => `<tr><td>${esc(r.yard)}</td><td class="num">${esc(r.loc)}</td><td><span class="mv ${r.move === 'GATE IN' ? 'in' : 'out'}">${r.move}</span></td><td class="n">${r.y}</td><td class="n">${r.s}</td><td class="n">${r.y - r.s > 0 ? '+' : ''}${r.y - r.s}</td><td>${r.y === r.s ? '<span class="pill ok">✓ ตรง</span>' : '<span class="pill bad">✕ ไม่ตรง</span>'}</td></tr>`).join('') + '</tbody>' : '';
+  document.getElementById('sysPill').innerHTML = !list.length ? '<span class="note">No system file in this range</span>' : bad ? `<span class="pill bad">✕ ${bad} mismatch${bad > 1 ? 'es' : ''}</span>` : '<span class="pill ok">✓ All match</span>';
+  document.getElementById('sysTable').innerHTML = list.length ? `<thead><tr><th>Yard</th><th>Location</th><th>Move</th><th class="n">Yard report</th><th class="n">System</th><th class="n">Diff</th><th>Status</th></tr></thead><tbody>` +
+    list.map(r => `<tr><td>${esc(r.yard)}</td><td class="num">${esc(r.loc)}</td><td><span class="mv ${r.move === 'GATE IN' ? 'in' : 'out'}">${r.move}</span></td><td class="n">${r.y}</td><td class="n">${r.s}</td><td class="n">${r.y - r.s > 0 ? '+' : ''}${r.y - r.s}</td><td>${r.y === r.s ? '<span class="pill ok">✓ Match</span>' : '<span class="pill bad">✕ Mismatch</span>'}</td></tr>`).join('') + '</tbody>' : '';
   const diffs = rows.filter(r => r.check && r.check !== 'OK');
   // public build carries no container-level detail: show the count only
-  document.getElementById('diffBox').innerHTML = DATA.public ? (diffs.length ? `<div class="note">ตู้ที่ไม่ตรงกับระบบ ${diffs.length} ตู้</div>` : '') : diffs.length ? `<div class="eyebrow" style="margin-top:4px">ตู้ที่ไม่ตรงกับระบบ (${diffs.length})</div><div class="scroll"><table><thead><tr><th>วันที่</th><th>ลาน</th><th>Move</th><th>ตู้</th><th>TPSZ</th><th>ลูกค้า</th><th>Booking / เลขงาน</th><th>เวลา</th><th>ปัญหา</th></tr></thead><tbody>` +
-    diffs.map(r => `<tr><td class="num">${fmtD(r.d)}</td><td>${esc(r.yard)}</td><td><span class="mv ${r.move === 'GATE IN' ? 'in' : 'out'}">${r.move}</span></td><td class="num"><b>${esc(r.cntr)}</b></td><td class="num">${esc(r.tpsz)}</td><td>${esc(r.cust)}</td><td class="num">${esc(r.ref)}</td><td class="num">${esc(r.time)}</td><td><span class="pill bad">${esc(r.check)}</span></td></tr>`).join('') + '</tbody></table></div>' : '';
+  document.getElementById('diffBox').innerHTML = DATA.public ? (diffs.length ? `<div class="note">${diffs.length} container${diffs.length > 1 ? 's' : ''} not matching the system</div>` : '') : diffs.length ? `<div class="eyebrow" style="margin-top:4px">Containers not matching the system (${diffs.length})</div><div class="scroll"><table><thead><tr><th>Date</th><th>Yard</th><th>Move</th><th>Container</th><th>TPSZ</th><th>Customer</th><th>Booking / Job no.</th><th>Time</th><th>Issue</th></tr></thead><tbody>` +
+    diffs.map(r => `<tr><td class="num">${fmtD(r.d)}</td><td>${esc(r.yard)}</td><td><span class="mv ${r.move === 'GATE IN' ? 'in' : 'out'}">${r.move}</span></td><td class="num"><b>${esc(r.cntr)}</b></td><td class="num">${esc(r.tpsz)}</td><td>${esc(r.cust)}</td><td class="num">${esc(r.ref)}</td><td class="num">${esc(r.time)}</td><td><span class="pill bad">${esc(ISSUE_EN[r.check] || r.check)}</span></td></tr>`).join('') + '</tbody></table></div>' : '';
 }
 
 
